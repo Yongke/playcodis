@@ -1,0 +1,32 @@
+FROM phusion/baseimage
+
+## basic
+RUN sed -i -e 's/archive.ubuntu.com/cn.archive.ubuntu.com/g' /etc/apt/sources.list && \
+    apt-get update && apt-get install -y build-essential wget git && \
+    apt-get clean all
+
+## GO
+ENV GOROOT=/usr/local/go
+ENV GOPATH=/home/codis/go
+
+ARG GOPKG_URL="https://storage.googleapis.com/golang"
+ARG GOPKG="go1.6.1.linux-amd64.tar.gz"
+
+RUN groupadd -r codis && useradd -r -g codis codis -s /bin/bash -m && \
+    mkdir -pv ${GOPATH} && cd ${GOPATH} && \
+    wget ${GOPKG_URL}/${GOPKG} && tar zxf ${GOPKG} && rm -f ${GOPKG} && \
+    mv go /usr/local/
+
+env PATH=$PATH:$GOROOT/bin:$GOPATH/bin:/home/codis/bin
+
+## codis
+RUN export http_proxy="http://192.168.100.10:8118/" && \
+    export https_proxy="http://192.168.100.10:8118/" && \
+    ( go get -u -d github.com/CodisLabs/codis || true ) && \
+    cd ${GOPATH}/src/github.com/CodisLabs/codis && \
+    make -C extern/redis-2.8.21/deps && \
+    GO15VENDOREXPERIMENT=0 make && \
+    mv bin /home/codis/bin 
+ADD config.ini /home/codis/bin
+RUN chown -R codis:codis /home/codis/bin
+
